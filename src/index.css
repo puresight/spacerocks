@@ -16,30 +16,40 @@ body {
   height: 100%;
   overflow: hidden;
   background-color: #05070c;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #root {
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 .game-shell {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background-color: #05070c;
+  touch-action: none;
 }
 
 .game-canvas-host {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  touch-action: none;
 }
 
 .game-canvas-host canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  touch-action: none;
 }
 
 .game-loading,
@@ -53,10 +63,127 @@ body {
   font-size: 18px;
   letter-spacing: 2px;
   background-color: #05070c;
+  pointer-events: none;
 }
 
 .game-error {
   color: #ff7a7a;
   text-align: center;
   padding: 0 24px;
+}
+
+/* ===== Touch controls overlay ===== */
+
+.tc-root {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.tc-joystick-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tc-joystick-base {
+  position: absolute;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 249, 255, 0.6);
+  background: rgba(125, 249, 255, 0.08);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.tc-joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(125, 249, 255, 0.55);
+  box-shadow: 0 0 12px rgba(125, 249, 255, 0.4);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.tc-buttons {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tc-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid rgba(184, 255, 92, 0.8);
+  background: rgba(184, 255, 92, 0.12);
+  color: #b8ff5c;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  letter-spacing: 2px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.tc-fire {
+  width: 96px;
+  height: 96px;
+  font-size: 18px;
+}
+
+.tc-brake {
+  width: 64px;
+  height: 64px;
+  font-size: 12px;
+  border-color: rgba(255, 166, 69, 0.8);
+  background: rgba(255, 166, 69, 0.12);
+  color: #ffa645;
+}
+
+.tc-button-active {
+  background: rgba(184, 255, 92, 0.35);
+  box-shadow: 0 0 16px rgba(184, 255, 92, 0.5);
+}
+
+.tc-brake.tc-button-active {
+  background: rgba(255, 166, 69, 0.35);
+  box-shadow: 0 0 16px rgba(255, 166, 69, 0.5);
+}
+
+@media (max-width: 480px) {
+  .tc-fire {
+    width: 84px;
+    height: 84px;
+    font-size: 16px;
+  }
+  .tc-brake {
+    width: 56px;
+    height: 56px;
+    font-size: 11px;
+  }
 }

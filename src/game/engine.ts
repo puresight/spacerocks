@@ -6,6 +6,7 @@ import { InputState } from './input';
 import { initRapier } from './init';
 import type { GameState, GameStateListener } from './state';
 import { computeAsteroidInertia, computeAsteroidMass, computeShipInertia, genAsteroidPolygon, randRange, type Vec2 } from './utils';
+import { TouchControls } from './touch';
 
 type Body = RAPIER.RigidBody;
 
@@ -33,6 +34,7 @@ export class GameEngine {
   private world!: RAPIER.World;
   private hud!: Hud;
   private input = new InputState();
+  private touch = new TouchControls(this.input);
   private entityLayer = new Container();
   private entities = new Map<number, Entity>();
   private ship: Entity | null = null;
@@ -53,6 +55,7 @@ export class GameEngine {
   private worldWidth = 1280;
   private worldHeight = 720;
   private resizeHandler?: () => void;
+  private visualViewportHandler?: () => void;
 
   async mount(container: HTMLElement): Promise<void> {
     await initRapier();
@@ -81,15 +84,23 @@ export class GameEngine {
     this.app.stage.addChild(this.hud.view);
 
     this.input.attach();
+    this.touch.attach(container);
     this.app.ticker.add(this.update);
     this.resizeHandler = () => this.onResize();
     window.addEventListener('resize', this.resizeHandler);
+    this.visualViewportHandler = () => this.onResize();
+    window.visualViewport?.addEventListener('resize', this.visualViewportHandler);
+    window.visualViewport?.addEventListener('scroll', this.visualViewportHandler);
 
+    const isTouch =
+      'ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0;
     this.setState({ ...this.state, phase: 'ready', lives: 3, score: 0, wave: 1 });
     this.hud.showOverlay(
       'ASTEROIDS',
-      'W A D / Arrows to move - SPACE to fire',
-      'PRESS ENTER TO START',
+      isTouch
+        ? 'LEFT SIDE: DRAG TO STEER & THRUST'
+        : 'W A D / Arrows to move - SPACE to fire',
+      isTouch ? 'TAP FIRE TO START' : 'PRESS ENTER TO START',
       this.worldWidth,
       this.worldHeight
     );
@@ -101,7 +112,12 @@ export class GameEngine {
     this.destroyed = true;
     this.app.ticker.remove(this.update);
     this.input.detach();
+    this.touch.detach();
     if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler);
+    if (this.visualViewportHandler) {
+      window.visualViewport?.removeEventListener('resize', this.visualViewportHandler);
+      window.visualViewport?.removeEventListener('scroll', this.visualViewportHandler);
+    }
     if (!this.app.renderer) return;
     this.clearEntities();
     this.collisionQueue?.free();
@@ -238,11 +254,9 @@ export class GameEngine {
   private handleShipControl(dt: number): void {
     if (!this.ship || this.respawnTimer > 0) return;
     const body = this.ship.body;
-    if (this.input.rotateLeft) {
-      body.applyTorqueImpulse(-SHIP.torque * SHIP.angularInertia, true);
-    }
-    if (this.input.rotateRight) {
-      body.applyTorqueImpulse(SHIP.torque * SHIP.angularInertia, true);
+    const axis = this.input.rotateAxis;
+    if (axis !== 0) {
+      body.applyTorqueImpulse(axis * SHIP.torque * SHIP.angularInertia, true);
     }
     if (this.input.thrust) {
       const rot = body.rotation();
@@ -252,6 +266,11 @@ export class GameEngine {
       this.setFlameVisible(true);
     } else {
       this.setFlameVisible(false);
+    }
+    if (this.input.brake) {
+      const lv = body.linvel();
+      body.applyImpulse({ x: -lv.x * 0.08, y: -lv.y * 0.08 }, true);
+      body.setAngvel(body.angvel() * 0.9, true);
     }
     // clamp max speed
     const lv = body.linvel();
@@ -592,8 +611,9 @@ export class GameEngine {
 
   private checkStartInput(): void {
     if (this.state.phase !== 'ready' && this.state.phase !== 'gameover') return;
-    if (!this.input.restart) return;
-    if (this.gameoverAt > 0 && performance.now() - this.gameoverAt < 600) return;
-    this.startGame();
+    if (this.input.restart || this.input.fire) {
+      if (this.gameoverAt > 0 && performance.now() - this.gameoverAt < 600) return;
+      this.startGame();
+    }
   }
 }
