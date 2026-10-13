@@ -38,7 +38,7 @@ export class GameEngine {
   private ship: Entity | null = null;
   private bodiesToRemove: Body[] = [];
   private collidersToRemove: RAPIER.Collider[] = [];
-  private collisionQueue = new RAPIER.EventQueue(true);
+  private collisionQueue: RAPIER.EventQueue | null = null;
 
   private accumulator = 0;
   private fireCooldown = 0;
@@ -57,6 +57,7 @@ export class GameEngine {
   async mount(container: HTMLElement): Promise<void> {
     await initRapier();
     this.world = new RAPIER.World(WORLD.gravity);
+    this.collisionQueue = new RAPIER.EventQueue(true);
 
     await this.app.init({
       resizeTo: container,
@@ -103,7 +104,8 @@ export class GameEngine {
     if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler);
     if (!this.app.renderer) return;
     this.clearEntities();
-    this.collisionQueue.free();
+    this.collisionQueue?.free();
+    this.collisionQueue = null;
     this.app.destroy(true, { children: true });
   }
 
@@ -174,7 +176,7 @@ export class GameEngine {
       this.handleFiring(dt);
       this.handleTimers(dt);
       this.wrapAll();
-      this.world.step(this.collisionQueue);
+      this.world.step(this.collisionQueue!);
       this.handleCollisions();
       this.cleanupRemoved();
     }
@@ -423,6 +425,7 @@ export class GameEngine {
 
   // ===== Collisions =====
   private handleCollisions(): void {
+    if (!this.collisionQueue) return;
     this.collisionQueue.drainCollisionEvents((h1: number, h2: number, started: boolean) => {
       if (!started) return;
       const c1 = this.world.getCollider(h1);
