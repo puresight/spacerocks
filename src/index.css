@@ -99,12 +99,6 @@ body {
   gap: 12px;
 }
 
-.tc-main-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-}
-
 .tc-buttons {
   position: absolute;
   right: max(16px, env(safe-area-inset-right));
@@ -120,6 +114,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 72px;
+  height: 72px;
+  font-size: 12px;
   border-radius: 50%;
   border: 2px solid rgba(184, 255, 92, 0.8);
   background: rgba(184, 255, 92, 0.12);
@@ -134,9 +131,6 @@ body {
 }
 
 .tc-thrust {
-  width: 84px;
-  height: 84px;
-  font-size: 13px;
   border-color: rgba(255, 166, 69, 0.8);
   background: rgba(255, 166, 69, 0.12);
   color: #ffa645;
@@ -148,8 +142,6 @@ body {
 }
 
 .tc-rotate {
-  width: 64px;
-  height: 64px;
   font-size: 18px;
   border-color: rgba(125, 249, 255, 0.8);
   background: rgba(125, 249, 255, 0.1);
@@ -162,18 +154,7 @@ body {
 }
 
 .tc-fire {
-  width: 96px;
-  height: 96px;
-  font-size: 18px;
-}
-
-.tc-brake {
-  width: 64px;
-  height: 64px;
-  font-size: 12px;
-  border-color: rgba(255, 166, 69, 0.8);
-  background: rgba(255, 166, 69, 0.12);
-  color: #ffa645;
+  border-color: rgba(184, 255, 92, 0.9);
 }
 
 .tc-button-active {
@@ -181,25 +162,49 @@ body {
   box-shadow: 0 0 16px rgba(184, 255, 92, 0.5);
 }
 
+.tc-stick-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 55%;
+  height: 60%;
+  z-index: 5;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tc-stick-base {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 249, 255, 0.35);
+  background: rgba(125, 249, 255, 0.06);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tc-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 249, 255, 0.7);
+  background: rgba(125, 249, 255, 0.15);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 @media (max-width: 480px) {
-  .tc-fire {
-    width: 84px;
-    height: 84px;
-    font-size: 16px;
-  }
-  .tc-brake {
-    width: 56px;
-    height: 56px;
-    font-size: 11px;
-  }
-  .tc-thrust {
-    width: 74px;
-    height: 74px;
-    font-size: 12px;
+  .tc-button {
+    width: 60px;
+    height: 60px;
+    font-size: 10px;
   }
   .tc-rotate {
-    width: 56px;
-    height: 56px;
-    font-size: 16px;
+    font-size: 14px;
   }
 }

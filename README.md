@@ -21,10 +21,12 @@ A classic vector-style arcade shooter built with React, TypeScript, PixiJS, and 
 
 On-screen buttons (shown only on touch devices):
 
-- **Left side:** two arrow buttons to rotate, **THRUST** button above them
+- **Left side:** **THRUST** button above the two rotate arrows
 - **Right side:** **FIRE** button, **BRAKE** button beside it
 
 All buttons support simultaneous presses, so you can turn, thrust, and fire at once. Brake is available on touch only.
+
+As an alternative to the buttons, press and drag anywhere in the lower-left area of the screen: drag left/right to rotate, drag up to thrust — a virtual thumbstick appears where you touch.
 
 ## Tech stack
 
