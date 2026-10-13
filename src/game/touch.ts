@@ -1,113 +1,44 @@
 import type { InputState } from './input';
 
-const JOYSTICK_MAX_RADIUS = 56;
-const ROTATE_DEAD_ZONE = 0.18;
-const THRUST_MIN_DY = 26;
-
 /**
- * DOM-based touch overlay: floating joystick on the left half, FIRE and BRAKE
- * buttons on the right. Pointer events with pointerId tracking keep steering,
- * thrust, and fire simultaneous. Attached only when touch capability exists.
+ * DOM-based touch overlay with separate controls: rotate-left / rotate-right /
+ * THRUST buttons on the left, FIRE and BRAKE on the right. Pointer events with
+ * per-button pointerId tracking keep all actions simultaneous. Attached only
+ * when touch capability exists.
  */
 export class TouchControls {
   private root: HTMLDivElement | null = null;
-  private joystickZone: HTMLDivElement | null = null;
-  private joystickBase: HTMLDivElement | null = null;
-  private joystickKnob: HTMLDivElement | null = null;
-  private fireButton: HTMLButtonElement | null = null;
-  private brakeButton: HTMLButtonElement | null = null;
+  private buttons: { el: HTMLButtonElement; pointers: Set<number> }[] = [];
+  private input: InputState;
 
-  private joystickPointerId: number | null = null;
-  private joystickOrigin = { x: 0, y: 0 };
-  private firePointerIds = new Set<number>();
-  private brakePointerIds = new Set<number>();
-
-  constructor(private input: InputState) {}
-
-  private onPointerDown = (e: PointerEvent): void => {
-    if (this.joystickPointerId !== null) return;
-    this.joystickPointerId = e.pointerId;
-    this.joystickOrigin = { x: e.clientX, y: e.clientY };
-    this.showJoystick(e.clientX, e.clientY);
-    this.joystickZone?.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  };
-
-  private onPointerMove = (e: PointerEvent): void => {
-    if (e.pointerId !== this.joystickPointerId) return;
-    const dx = e.clientX - this.joystickOrigin.x;
-    const dy = e.clientY - this.joystickOrigin.y;
-
-    const dist = Math.hypot(dx, dy);
-    const scale = dist > JOYSTICK_MAX_RADIUS ? JOYSTICK_MAX_RADIUS / dist : 1;
-    if (this.joystickKnob) {
-      this.joystickKnob.style.transform = `translate(calc(-50% + ${dx * scale}px), calc(-50% + ${dy * scale}px))`;
-    }
-
-    const normX = dx / JOYSTICK_MAX_RADIUS;
-    const rotate = Math.abs(normX) > ROTATE_DEAD_ZONE ? normX : 0;
-    this.input.setVirtualRotate(Math.max(-1, Math.min(1, rotate)));
-    this.input.setVirtualThrust(dy < -THRUST_MIN_DY);
-    e.preventDefault();
-  };
-
-  private onPointerUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.joystickPointerId) return;
-    this.joystickPointerId = null;
-    this.hideJoystick();
-    this.input.setVirtualRotate(0);
-    this.input.setVirtualThrust(false);
-  };
-
-  private onFireDown = (e: PointerEvent): void => {
-    this.firePointerIds.add(e.pointerId);
-    this.input.setVirtualFire(true);
-    this.fireButton?.classList.add('tc-button-active');
-    e.preventDefault();
-  };
-
-  private onFireUp = (e: PointerEvent): void => {
-    this.firePointerIds.delete(e.pointerId);
-    if (this.firePointerIds.size === 0) {
-      this.input.setVirtualFire(false);
-      this.fireButton?.classList.remove('tc-button-active');
-    }
-  };
-
-  private onBrakeDown = (e: PointerEvent): void => {
-    this.brakePointerIds.add(e.pointerId);
-    this.input.setVirtualBrake(true);
-    this.brakeButton?.classList.add('tc-button-active');
-    e.preventDefault();
-  };
-
-  private onBrakeUp = (e: PointerEvent): void => {
-    this.brakePointerIds.delete(e.pointerId);
-    if (this.brakePointerIds.size === 0) {
-      this.input.setVirtualBrake(false);
-      this.brakeButton?.classList.remove('tc-button-active');
-    }
-  };
-
-  private onRootPointerEnd = (e: PointerEvent): void => {
-    if (e.pointerId === this.joystickPointerId) this.onPointerUp(e);
-    this.onFireUp(e);
-    this.onBrakeUp(e);
-  };
-
-  private showJoystick(x: number, y: number): void {
-    if (!this.joystickBase || !this.joystickKnob) return;
-    this.joystickBase.style.left = `${x}px`;
-    this.joystickBase.style.top = `${y}px`;
-    this.joystickBase.style.opacity = '0.5';
-    this.joystickKnob.style.opacity = '0.8';
-    this.joystickKnob.style.transform = 'translate(-50%, -50%)';
+  constructor(input: InputState) {
+    this.input = input;
   }
 
-  private hideJoystick(): void {
-    if (!this.joystickBase || !this.joystickKnob) return;
-    this.joystickBase.style.opacity = '0';
-    this.joystickKnob.style.opacity = '0';
+  private bindButton(
+    el: HTMLButtonElement,
+    on: () => void,
+    off: () => void
+  ): void {
+    const state = { el, pointers: new Set<number>() };
+    this.buttons.push(state);
+    const down = (e: PointerEvent): void => {
+      state.pointers.add(e.pointerId);
+      on();
+      el.classList.add('tc-button-active');
+      e.preventDefault();
+    };
+    const up = (e: PointerEvent): void => {
+      state.pointers.delete(e.pointerId);
+      if (state.pointers.size === 0) {
+        off();
+        el.classList.remove('tc-button-active');
+      }
+    };
+    el.addEventListener('pointerdown', down, { passive: false });
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', up);
   }
 
   /** Mounts the overlay and hooks events. Returns false if no touch device. */
@@ -119,8 +50,12 @@ export class TouchControls {
     const el = document.createElement('div');
     el.className = 'tc-root';
     el.innerHTML = `
-      <div class="tc-joystick-zone">
-        <div class="tc-joystick-base"><div class="tc-joystick-knob"></div></div>
+      <div class="tc-left">
+        <button class="tc-button tc-thrust" type="button" aria-label="Thrust">THRUST</button>
+        <div class="tc-rotate-row">
+          <button class="tc-button tc-rotate" type="button" aria-label="Rotate left">&#9664;</button>
+          <button class="tc-button tc-rotate" type="button" aria-label="Rotate right">&#9654;</button>
+        </div>
       </div>
       <div class="tc-buttons">
         <button class="tc-button tc-brake" type="button" aria-label="Brake">BRAKE</button>
@@ -129,31 +64,28 @@ export class TouchControls {
     `;
     root.appendChild(el);
     this.root = el;
-    this.joystickZone = el.querySelector('.tc-joystick-zone');
-    this.joystickBase = el.querySelector('.tc-joystick-base');
-    this.joystickKnob = el.querySelector('.tc-joystick-knob');
-    this.fireButton = el.querySelector('.tc-fire');
-    this.brakeButton = el.querySelector('.tc-brake');
-    const zone = this.joystickZone;
-    const fire = this.fireButton;
-    const brake = this.brakeButton;
-    if (!zone || !fire || !brake) return false;
 
-    zone.addEventListener('pointerdown', this.onPointerDown, {
-      passive: false,
-    });
-    zone.addEventListener('pointermove', this.onPointerMove, {
-      passive: false,
-    });
-    el.addEventListener('pointerup', this.onRootPointerEnd);
-    el.addEventListener('pointercancel', this.onRootPointerEnd);
+    const thrust = el.querySelector<HTMLButtonElement>('.tc-thrust');
+    const rotateButtons = el.querySelectorAll<HTMLButtonElement>('.tc-rotate');
+    const brake = el.querySelector<HTMLButtonElement>('.tc-brake');
+    const fire = el.querySelector<HTMLButtonElement>('.tc-fire');
+    if (!thrust || !brake || !fire || rotateButtons.length < 2) return false;
 
-    fire.addEventListener('pointerdown', this.onFireDown, {
-      passive: false,
-    });
-    brake.addEventListener('pointerdown', this.onBrakeDown, {
-      passive: false,
-    });
+    this.bindButton(thrust, () => this.input.setVirtualThrust(true), () =>
+      this.input.setVirtualThrust(false)
+    );
+    this.bindButton(rotateButtons[0], () => this.input.setVirtualRotate(-1), () =>
+      this.input.setVirtualRotate(0)
+    );
+    this.bindButton(rotateButtons[1], () => this.input.setVirtualRotate(1), () =>
+      this.input.setVirtualRotate(0)
+    );
+    this.bindButton(brake, () => this.input.setVirtualBrake(true), () =>
+      this.input.setVirtualBrake(false)
+    );
+    this.bindButton(fire, () => this.input.setVirtualFire(true), () =>
+      this.input.setVirtualFire(false)
+    );
 
     // Block default gestures without breaking multi-touch routing
     el.addEventListener('touchstart', (e) => e.preventDefault(), {
@@ -164,22 +96,9 @@ export class TouchControls {
 
   detach(): void {
     if (!this.root) return;
-    this.joystickZone?.removeEventListener('pointerdown', this.onPointerDown);
-    this.joystickZone?.removeEventListener('pointermove', this.onPointerMove);
-    this.root.removeEventListener('pointerup', this.onRootPointerEnd);
-    this.root.removeEventListener('pointercancel', this.onRootPointerEnd);
-    this.fireButton?.removeEventListener('pointerdown', this.onFireDown);
-    this.brakeButton?.removeEventListener('pointerdown', this.onBrakeDown);
     this.root.remove();
     this.root = null;
-    this.joystickZone = null;
-    this.joystickBase = null;
-    this.joystickKnob = null;
-    this.fireButton = null;
-    this.brakeButton = null;
-    this.firePointerIds.clear();
-    this.brakePointerIds.clear();
-    this.joystickPointerId = null;
+    this.buttons = [];
     this.input.clearVirtual();
   }
 }

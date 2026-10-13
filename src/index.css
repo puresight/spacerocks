@@ -82,44 +82,21 @@ body {
   touch-action: none;
 }
 
-.tc-joystick-zone {
+.tc-left {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 50%;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   pointer-events: auto;
   touch-action: none;
 }
 
-.tc-joystick-base {
-  position: absolute;
-  width: 128px;
-  height: 128px;
-  border-radius: 50%;
-  border: 2px solid rgba(125, 249, 255, 0.6);
-  background: rgba(125, 249, 255, 0.08);
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  transition: opacity 0.12s ease-out;
-  pointer-events: none;
-  touch-action: none;
-}
-
-.tc-joystick-knob {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(125, 249, 255, 0.55);
-  box-shadow: 0 0 12px rgba(125, 249, 255, 0.4);
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  transition: opacity 0.12s ease-out;
-  pointer-events: none;
-  touch-action: none;
+.tc-rotate-row {
+  display: flex;
+  gap: 12px;
 }
 
 .tc-buttons {
@@ -148,6 +125,26 @@ body {
   -webkit-user-select: none;
   user-select: none;
   cursor: pointer;
+}
+
+.tc-thrust {
+  width: 84px;
+  height: 84px;
+  font-size: 13px;
+}
+
+.tc-rotate {
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
+  border-color: rgba(125, 249, 255, 0.8);
+  background: rgba(125, 249, 255, 0.1);
+  color: #7df9ff;
+}
+
+.tc-rotate.tc-button-active {
+  background: rgba(125, 249, 255, 0.3);
+  box-shadow: 0 0 16px rgba(125, 249, 255, 0.5);
 }
 
 .tc-fire {
@@ -185,5 +182,15 @@ body {
     width: 56px;
     height: 56px;
     font-size: 11px;
+  }
+  .tc-thrust {
+    width: 74px;
+    height: 74px;
+    font-size: 12px;
+  }
+  .tc-rotate {
+    width: 56px;
+    height: 56px;
+    font-size: 16px;
   }
 }

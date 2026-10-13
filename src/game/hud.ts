@@ -108,9 +108,11 @@ export class Hud {
     this.overlayHint.style.wordWrapWidth = width * 0.88;
 
     const cy = height / 2;
+    // blank line of breathing room between title and directions
+    const gap = titleSize * 0.9;
     this.overlayTitle.position.set(width / 2, cy - titleSize * 1.1);
-    this.overlaySub.position.set(width / 2, cy + subSize * 0.6);
-    this.overlayHint.position.set(width / 2, cy + subSize * 0.6 + hintSize * 2.4);
+    this.overlaySub.position.set(width / 2, cy - titleSize * 1.1 + titleSize / 2 + gap + subSize);
+    this.overlayHint.position.set(width / 2, cy - titleSize * 1.1 + titleSize / 2 + gap + subSize * 2.6 + hintSize * 1.6);
   }
 
   reset(): void {

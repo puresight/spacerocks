@@ -50,6 +50,7 @@ export class GameEngine {
   private extraLifeWatch = 0;
 
   private state: GameState = { phase: 'ready', wave: 1, score: 0, lives: 0 };
+  private isTouch = false;
   private listeners = new Set<GameStateListener>();
 
   private worldWidth = 1280;
@@ -94,11 +95,12 @@ export class GameEngine {
 
     const isTouch =
       'ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0;
+    this.isTouch = isTouch;
     this.setState({ ...this.state, phase: 'ready', lives: 3, score: 0, wave: 1 });
     this.hud.showOverlay(
-      'ASTEROIDS',
+      'SPACEROCKS',
       isTouch
-        ? 'TOUCH LEFT SIDE:\nDRAG TO TURN, PUSH UP TO FLY'
+        ? 'LEFT: TURN ARROWS + THRUST\nRIGHT: FIRE + BRAKE'
         : 'W A D / Arrows to move - SPACE to fire',
       isTouch ? 'TAP FIRE TO START' : 'PRESS ENTER TO START',
       this.worldWidth,
@@ -503,7 +505,7 @@ export class GameEngine {
     this.hud.showOverlay(
       'GAME OVER',
       `FINAL SCORE ${this.state.score}`,
-      'PRESS ENTER TO RESTART',
+      this.isTouch ? 'TAP FIRE TO RESTART' : 'PRESS ENTER TO RESTART',
       this.worldWidth,
       this.worldHeight
     );
