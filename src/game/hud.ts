@@ -92,15 +92,20 @@ export class Hud {
 
   private layoutOverlay(width: number, height: number): void {
     // Scale type down on narrow screens so centered text always fits
-    const titleSize = Math.max(26, Math.min(56, width / 9));
+    const titleSize = Math.max(24, Math.min(56, width / 11));
     const subSize = Math.max(12, Math.min(24, width / 17));
     const hintSize = Math.max(10, Math.min(18, width / 24));
     this.overlayTitle.style.fontSize = titleSize;
     this.overlayTitle.style.letterSpacing = titleSize * 0.1;
     this.overlaySub.style.fontSize = subSize;
     this.overlaySub.style.letterSpacing = subSize * 0.12;
+    this.overlaySub.style.wordWrap = true;
+    this.overlaySub.style.wordWrapWidth = width * 0.88;
+    this.overlaySub.style.lineHeight = subSize * 1.5;
     this.overlayHint.style.fontSize = hintSize;
     this.overlayHint.style.letterSpacing = hintSize * 0.11;
+    this.overlayHint.style.wordWrap = true;
+    this.overlayHint.style.wordWrapWidth = width * 0.88;
 
     const cy = height / 2;
     this.overlayTitle.position.set(width / 2, cy - titleSize * 1.1);

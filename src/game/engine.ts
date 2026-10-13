@@ -98,7 +98,7 @@ export class GameEngine {
     this.hud.showOverlay(
       'ASTEROIDS',
       isTouch
-        ? 'LEFT: DRAG TO STEER + THRUST'
+        ? 'TOUCH LEFT SIDE:\nDRAG TO TURN, PUSH UP TO FLY'
         : 'W A D / Arrows to move - SPACE to fire',
       isTouch ? 'TAP FIRE TO START' : 'PRESS ENTER TO START',
       this.worldWidth,
