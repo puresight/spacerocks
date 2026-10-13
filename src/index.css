@@ -84,6 +84,7 @@ body {
 
 .tc-left {
   position: absolute;
+  z-index: 6;
   left: max(16px, env(safe-area-inset-left));
   bottom: max(20px, env(safe-area-inset-bottom));
   display: flex;
@@ -101,6 +102,7 @@ body {
 
 .tc-buttons {
   position: absolute;
+  z-index: 6;
   right: max(16px, env(safe-area-inset-right));
   bottom: max(20px, env(safe-area-inset-bottom));
   display: flex;
@@ -185,7 +187,7 @@ body {
 }
 
 .tc-stick-base {
-  position: absolute;
+  position: fixed;
   width: 96px;
   height: 96px;
   border-radius: 50%;
