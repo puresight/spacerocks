@@ -51,14 +51,16 @@ export class TouchControls {
     el.className = 'tc-root';
     el.innerHTML = `
       <div class="tc-left">
-        <button class="tc-button tc-thrust" type="button" aria-label="Thrust">THRUST</button>
         <div class="tc-rotate-row">
           <button class="tc-button tc-rotate" type="button" aria-label="Rotate left">&#9664;</button>
           <button class="tc-button tc-rotate" type="button" aria-label="Rotate right">&#9654;</button>
         </div>
+        <div class="tc-main-row">
+          <button class="tc-button tc-thrust" type="button" aria-label="Thrust">THRUST</button>
+          <button class="tc-button tc-brake" type="button" aria-label="Brake">BRAKE</button>
+        </div>
       </div>
       <div class="tc-buttons">
-        <button class="tc-button tc-brake" type="button" aria-label="Brake">BRAKE</button>
         <button class="tc-button tc-fire" type="button" aria-label="Fire">FIRE</button>
       </div>
     `;

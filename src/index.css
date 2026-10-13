@@ -99,6 +99,12 @@ body {
   gap: 12px;
 }
 
+.tc-main-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
 .tc-buttons {
   position: absolute;
   right: max(16px, env(safe-area-inset-right));
@@ -131,6 +137,14 @@ body {
   width: 84px;
   height: 84px;
   font-size: 13px;
+  border-color: rgba(255, 166, 69, 0.8);
+  background: rgba(255, 166, 69, 0.12);
+  color: #ffa645;
+}
+
+.tc-thrust.tc-button-active {
+  background: rgba(255, 166, 69, 0.35);
+  box-shadow: 0 0 16px rgba(255, 166, 69, 0.5);
 }
 
 .tc-rotate {
@@ -165,11 +179,6 @@ body {
 .tc-button-active {
   background: rgba(184, 255, 92, 0.35);
   box-shadow: 0 0 16px rgba(184, 255, 92, 0.5);
-}
-
-.tc-brake.tc-button-active {
-  background: rgba(255, 166, 69, 0.35);
-  box-shadow: 0 0 16px rgba(255, 166, 69, 0.5);
 }
 
 @media (max-width: 480px) {
