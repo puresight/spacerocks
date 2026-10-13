@@ -221,7 +221,7 @@ export class GameEngine {
         { x: -SHIP.radius * 0.85, y: -SHIP.radius * 0.8 }
       )
         .setDensity(0)
-        .setCollisionGroups((shipCollGroup << 16) | (asteroidCollGroup | shipCollGroup))
+        .setCollisionGroups((shipCollGroup << 16) | (asteroidCollGroup | shipCollGroup | bulletCollGroup))
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
       body
     );
@@ -406,7 +406,7 @@ export class GameEngine {
       colliderDesc
         .setDensity(0)
         .setRestitution(0.9)
-        .setCollisionGroups((asteroidCollGroup << 16) | (asteroidCollGroup | shipCollGroup))
+        .setCollisionGroups((asteroidCollGroup << 16) | (asteroidCollGroup | shipCollGroup | bulletCollGroup))
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
       this.world.createCollider(colliderDesc, body);
     }
