@@ -1,0 +1,62 @@
+:root {
+  font-family: 'Courier New', monospace;
+  color-scheme: dark;
+  background-color: #05070c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #05070c;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.game-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-color: #05070c;
+}
+
+.game-canvas-host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.game-canvas-host canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.game-loading,
+.game-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7df9ff;
+  font-size: 18px;
+  letter-spacing: 2px;
+  background-color: #05070c;
+}
+
+.game-error {
+  color: #ff7a7a;
+  text-align: center;
+  padding: 0 24px;
+}
