@@ -114,9 +114,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
-  font-size: 12px;
+  width: 84px;
+  height: 84px;
+  font-size: 13px;
   border-radius: 50%;
   border: 2px solid rgba(184, 255, 92, 0.8);
   background: rgba(184, 255, 92, 0.12);
@@ -155,6 +155,17 @@ body {
 
 .tc-fire {
   border-color: rgba(184, 255, 92, 0.9);
+}
+
+.tc-brake {
+  border-color: rgba(255, 166, 69, 0.8);
+  background: rgba(255, 166, 69, 0.12);
+  color: #ffa645;
+}
+
+.tc-brake.tc-button-active {
+  background: rgba(255, 166, 69, 0.35);
+  box-shadow: 0 0 16px rgba(255, 166, 69, 0.5);
 }
 
 .tc-button-active {
@@ -200,9 +211,9 @@ body {
 
 @media (max-width: 480px) {
   .tc-button {
-    width: 60px;
-    height: 60px;
-    font-size: 10px;
+    width: 72px;
+    height: 72px;
+    font-size: 11px;
   }
   .tc-rotate {
     font-size: 14px;
