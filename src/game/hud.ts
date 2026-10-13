@@ -80,13 +80,32 @@ export class Hud {
     this.waveText.position.set(width / 2, 18);
     this.livesText.position.set(width - 24, 18);
     this.layoutOverlay(width, height);
+    if (this.overlayVisible) this.drawOverlayBg(width, height);
+  }
+
+  private overlayVisible = false;
+
+  private drawOverlayBg(width: number, height: number): void {
+    this.overlay.clear();
+    this.overlay.rect(0, 0, width, height).fill({ color: 0x05070c, alpha: 0.72 });
   }
 
   private layoutOverlay(width: number, height: number): void {
+    // Scale type down on narrow screens so centered text always fits
+    const titleSize = Math.max(26, Math.min(56, width / 9));
+    const subSize = Math.max(12, Math.min(24, width / 17));
+    const hintSize = Math.max(10, Math.min(18, width / 24));
+    this.overlayTitle.style.fontSize = titleSize;
+    this.overlayTitle.style.letterSpacing = titleSize * 0.1;
+    this.overlaySub.style.fontSize = subSize;
+    this.overlaySub.style.letterSpacing = subSize * 0.12;
+    this.overlayHint.style.fontSize = hintSize;
+    this.overlayHint.style.letterSpacing = hintSize * 0.11;
+
     const cy = height / 2;
-    this.overlayTitle.position.set(width / 2, cy - 60);
-    this.overlaySub.position.set(width / 2, cy + 12);
-    this.overlayHint.position.set(width / 2, cy + 70);
+    this.overlayTitle.position.set(width / 2, cy - titleSize * 1.1);
+    this.overlaySub.position.set(width / 2, cy + subSize * 0.6);
+    this.overlayHint.position.set(width / 2, cy + subSize * 0.6 + hintSize * 2.4);
   }
 
   reset(): void {
@@ -122,16 +141,14 @@ export class Hud {
 
   showOverlay(title: string, sub: string, hint: string, width: number, height: number): void {
     this.layoutOverlay(width, height);
-    const w = width;
-    const h = height;
-    this.overlay.clear();
-    this.overlay.rect(0, 0, w, h).fill({ color: 0x05070c, alpha: 0.72 });
+    this.drawOverlayBg(width, height);
     this.overlayTitle.text = title;
     this.overlaySub.text = sub;
     this.overlayHint.text = hint;
     this.overlayTitle.visible = true;
     this.overlaySub.visible = true;
     this.overlayHint.visible = true;
+    this.overlayVisible = true;
   }
 
   hideOverlay(): void {
@@ -139,5 +156,6 @@ export class Hud {
     this.overlayTitle.visible = false;
     this.overlaySub.visible = false;
     this.overlayHint.visible = false;
+    this.overlayVisible = false;
   }
 }

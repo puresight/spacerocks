@@ -98,7 +98,7 @@ export class GameEngine {
     this.hud.showOverlay(
       'ASTEROIDS',
       isTouch
-        ? 'LEFT SIDE: DRAG TO STEER & THRUST'
+        ? 'LEFT: DRAG TO STEER + THRUST'
         : 'W A D / Arrows to move - SPACE to fire',
       isTouch ? 'TAP FIRE TO START' : 'PRESS ENTER TO START',
       this.worldWidth,
@@ -162,6 +162,7 @@ export class GameEngine {
   }
 
   private onResize(): void {
+    this.app.resize();
     this.worldWidth = this.app.screen.width;
     this.worldHeight = this.app.screen.height;
     this.hud.resize(this.worldWidth, this.worldHeight);
