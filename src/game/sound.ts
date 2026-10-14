@@ -9,6 +9,9 @@ export class SoundFX {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private reverbIR: AudioBuffer | null = null;
+  private reverb: ConvolverNode | null = null;
+  private reverbWet: GainNode | null = null;
   private thrustSource: AudioBufferSourceNode | null = null;
   private thrustGain: GainNode | null = null;
   private thrustFilter: BiquadFilterNode | null = null;
@@ -31,6 +34,9 @@ export class SoundFX {
     this.ctx = null;
     this.master = null;
     this.noiseBuffer = null;
+    this.reverbIR = null;
+    this.reverb = null;
+    this.reverbWet = null;
   }
 
   /** Creates the context if needed and resumes it from a user gesture. */
@@ -45,6 +51,12 @@ export class SoundFX {
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
       this.noiseBuffer = this.makeNoiseBuffer(this.ctx);
+      this.reverbIR = this.makeImpulseResponse(this.ctx, 1.0);
+      this.reverb = this.ctx.createConvolver();
+      this.reverb.buffer = this.reverbIR;
+      this.reverbWet = this.ctx.createGain();
+      this.reverbWet.gain.value = 0.35;
+      this.reverb.connect(this.reverbWet).connect(this.master);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -57,58 +69,151 @@ export class SoundFX {
     return buf;
   }
 
+  /** Decaying white-noise impulse response for the convolver. */
+  private makeImpulseResponse(ctx: AudioContext, seconds: number): AudioBuffer {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      }
+    }
+    return buf;
+  }
+
+  /** Routes a node into master, also feeding the shared reverb send. */
+  private connectBus(node: AudioNode): void {
+    if (!this.master || !this.reverb) return;
+    node.connect(this.master);
+    node.connect(this.reverb);
+  }
+
   private now(): number {
     return this.ctx?.currentTime ?? 0;
   }
 
-  /** Laser: square sweep 880 -> 110 Hz over 100ms with exponential decay. */
+  /** Laser: triangle sweep 2400 -> 600 Hz over 70ms plus a bandpass noise "puff". */
   laser(): void {
-    if (!this.ctx || !this.master || this.ctx.state !== 'running') return;
+    if (!this.ctx || this.ctx.state !== 'running') return;
     const t = this.now();
+
     const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(880, t);
-    osc.frequency.exponentialRampToValueAtTime(110, t + 0.1);
-    gain.gain.setValueAtTime(0.22, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.connect(gain).connect(this.master);
+    const oscGain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(2400, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.07);
+    oscGain.gain.setValueAtTime(0.2, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    osc.connect(oscGain);
+    this.connectBus(oscGain);
     osc.start(t);
-    osc.stop(t + 0.13);
+    osc.stop(t + 0.1);
     osc.onended = () => {
       osc.disconnect();
-      gain.disconnect();
+      oscGain.disconnect();
     };
+
+    // airy transient hiss at the start of the shot
+    if (this.noiseBuffer) {
+      const puff = this.ctx.createBufferSource();
+      puff.buffer = this.noiseBuffer;
+      puff.loop = true;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 3500;
+      bp.Q.value = 3;
+      const puffGain = this.ctx.createGain();
+      puffGain.gain.setValueAtTime(0.25, t);
+      puffGain.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+      puff.connect(bp).connect(puffGain);
+      this.connectBus(puffGain);
+      puff.start(t);
+      puff.stop(t + 0.045);
+      puff.onended = () => {
+        puff.disconnect();
+        bp.disconnect();
+        puffGain.disconnect();
+      };
+    }
   }
 
-  /** Explosion: filtered noise, pitch scaled by asteroid size rank. */
+  /**
+   * Explosion in three layers, size-scaled, through the shared reverb:
+   * crack (bandpass snap), crunch (sweeping resonant lowpass noise),
+   * rumble tail (sub-bass sine sweep).
+   */
   explosion(sizeRank: 0 | 1 | 2): void {
-    if (!this.ctx || !this.master || !this.noiseBuffer || this.ctx.state !== 'running') return;
+    if (!this.ctx || !this.noiseBuffer || this.ctx.state !== 'running') return;
     const t = this.now();
-    // larger rocks: deeper start, longer rumble
-    const fStart = [800, 600, 400][sizeRank];
-    const fEnd = [60, 48, 40][sizeRank];
-    const dur = [0.25, 0.3, 0.4][sizeRank];
-    const peak = [0.3, 0.36, 0.45][sizeRank];
+    const nodes: { stop?: AudioScheduledSourceNode; disconnect: AudioNode }[] = [];
+    // larger rocks: heavier crunch, longer rumble
+    const crunchStart = [1200, 1000, 800][sizeRank];
+    const crunchEnd = [220, 180, 150][sizeRank];
+    const crunchDur = [0.2, 0.25, 0.3][sizeRank];
+    const rumbleDur = [0.35, 0.45, 0.55][sizeRank];
+    const rumbleEnd = [55, 42, 30][sizeRank];
 
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuffer;
-    src.loop = true;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(fStart, t);
-    filter.frequency.exponentialRampToValueAtTime(fEnd, t + dur);
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(peak, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filter).connect(gain).connect(this.master);
-    src.start(t);
-    src.stop(t + dur + 0.05);
-    src.onended = () => {
-      src.disconnect();
-      filter.disconnect();
-      gain.disconnect();
-    };
+    // 1) kinetic crack: short bandpass snap
+    const crack = this.ctx.createBufferSource();
+    crack.buffer = this.noiseBuffer;
+    crack.loop = true;
+    const crackBp = this.ctx.createBiquadFilter();
+    crackBp.type = 'bandpass';
+    crackBp.frequency.setValueAtTime(3000, t);
+    crackBp.frequency.exponentialRampToValueAtTime(1200, t + 0.02);
+    crackBp.Q.value = 1.2;
+    const crackGain = this.ctx.createGain();
+    crackGain.gain.setValueAtTime(0.5, t);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
+    crack.connect(crackBp).connect(crackGain);
+    this.connectBus(crackGain);
+    crack.start(t);
+    crack.stop(t + 0.03);
+    nodes.push({ stop: crack, disconnect: crackBp });
+    nodes.push({ disconnect: crackGain });
+
+    // 2) mid-body crunch: sweeping resonant lowpass noise
+    const crunch = this.ctx.createBufferSource();
+    crunch.buffer = this.noiseBuffer;
+    crunch.loop = true;
+    const crunchLp = this.ctx.createBiquadFilter();
+    crunchLp.type = 'lowpass';
+    crunchLp.frequency.setValueAtTime(crunchStart, t);
+    crunchLp.frequency.exponentialRampToValueAtTime(crunchEnd, t + crunchDur);
+    crunchLp.Q.value = 4;
+    const crunchGain = this.ctx.createGain();
+    crunchGain.gain.setValueAtTime(0.4, t);
+    crunchGain.gain.exponentialRampToValueAtTime(0.001, t + crunchDur + 0.05);
+    crunch.connect(crunchLp).connect(crunchGain);
+    this.connectBus(crunchGain);
+    crunch.start(t);
+    crunch.stop(t + crunchDur + 0.08);
+    nodes.push({ stop: crunch, disconnect: crunchLp });
+    nodes.push({ disconnect: crunchGain });
+
+    // 3) low rumble tail: sub-bass sine sweep
+    const sub = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(100, t);
+    sub.frequency.exponentialRampToValueAtTime(rumbleEnd, t + rumbleDur);
+    subGain.gain.setValueAtTime(0.0001, t);
+    subGain.gain.exponentialRampToValueAtTime(0.45, t + 0.02);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + rumbleDur);
+    sub.connect(subGain);
+    this.connectBus(subGain);
+    sub.start(t);
+    sub.stop(t + rumbleDur + 0.05);
+    nodes.push({ stop: sub, disconnect: subGain });
+
+    const last = nodes[nodes.length - 1];
+    if (last?.stop) {
+      last.stop.onended = () => {
+        for (const n of nodes) n.stop?.disconnect();
+        for (const n of nodes) n.disconnect.disconnect();
+      };
+    }
   }
 
   /** Ship destroyed: the large, deep boom. */
