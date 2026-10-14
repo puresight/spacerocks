@@ -6,6 +6,7 @@ import { InputState } from './input';
 import { initRapier } from './init';
 import type { GameState, GameStateListener } from './state';
 import { computeAsteroidInertia, computeAsteroidMass, computeShipInertia, genAsteroidPolygon, randRange, type Vec2 } from './utils';
+import { SoundFX } from './sound';
 import { TouchControls } from './touch';
 
 type Body = RAPIER.RigidBody;
@@ -35,6 +36,7 @@ export class GameEngine {
   private hud!: Hud;
   private input = new InputState();
   private touch = new TouchControls(this.input);
+  private sound = new SoundFX();
   private entityLayer = new Container();
   private entities = new Map<number, Entity>();
   private ship: Entity | null = null;
@@ -85,6 +87,7 @@ export class GameEngine {
     this.app.stage.addChild(this.hud.view);
 
     this.input.attach();
+    this.sound.attach();
     this.touch.attach(container);
     this.app.ticker.add(this.update);
     this.resizeHandler = () => this.onResize();
@@ -114,6 +117,7 @@ export class GameEngine {
     this.destroyed = true;
     this.app.ticker.remove(this.update);
     this.input.detach();
+    this.sound.detach();
     this.touch.detach();
     if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler);
     if (this.visualViewportHandler) {
@@ -267,8 +271,10 @@ export class GameEngine {
       const fy = Math.sin(rot);
       body.applyImpulse({ x: fx * SHIP.thrust * dt, y: fy * SHIP.thrust * dt }, true);
       this.setFlameVisible(true);
+      this.sound.setThrust(true);
     } else {
       this.setFlameVisible(false);
+      this.sound.setThrust(false);
     }
     if (this.input.brake) {
       const lv = body.linvel();
@@ -359,6 +365,7 @@ export class GameEngine {
     this.entityLayer.addChild(view);
     const e: Entity = { body: bulletBody, view, kind: 'bullet', lifespan: BULLET.lifespan };
     this.entities.set(makeEntityId(), e);
+    this.sound.laser();
   }
 
   private handleTimers(dt: number): void {
@@ -488,6 +495,8 @@ export class GameEngine {
     const shipRef = this.ship;
     this.bodiesToRemove.push(shipRef.body);
     this.ship = null;
+    this.sound.setThrust(false);
+    this.sound.shipExplosion();
     this.setLivesDelta(-1);
     this.respawnTimer = 1.2;
     this.invulnerability = 0;
@@ -523,6 +532,7 @@ export class GameEngine {
         e.view.destroy({ children: true });
         if (e.kind === 'asteroid') {
           this.asteroidCount--;
+          this.sound.explosion(e.sizeRank ?? 0);
           if (this.state.phase === 'playing') this.splitAsteroid(e, pos);
         }
       }
@@ -598,6 +608,7 @@ export class GameEngine {
 
   // ===== Render sync =====
   private syncViews(): void {
+    this.sound.flushPendingThrust();
     for (const e of this.entities.values()) {
       const t = e.body.translation();
       e.view.position.set(t.x, t.y);
