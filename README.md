@@ -90,7 +90,3 @@ The build emits a static SPA in `/dist` configured for Cloudflare Workers static
 ## Tuning the game
 
 Almost every gameplay number lives in `src/game/config.ts`: ship thrust and torque, bullet speed and cooldown, asteroid sizes/speeds/points, scoring rules, and the color palette. Change a value and the dev server hot-reloads instantly.
-
-## License
-
-MIT.
