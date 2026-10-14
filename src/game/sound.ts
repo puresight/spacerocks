@@ -9,6 +9,9 @@ export class SoundFX {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private brownBuffer: AudioBuffer | null = null;
+  private crackBuffer: AudioBuffer | null = null;
+  private satCurve: Float32Array<ArrayBuffer> | null = null;
   private reverbIR: AudioBuffer | null = null;
   private reverb: ConvolverNode | null = null;
   private reverbWet: GainNode | null = null;
@@ -34,6 +37,9 @@ export class SoundFX {
     this.ctx = null;
     this.master = null;
     this.noiseBuffer = null;
+    this.brownBuffer = null;
+    this.crackBuffer = null;
+    this.satCurve = null;
     this.reverbIR = null;
     this.reverb = null;
     this.reverbWet = null;
@@ -51,6 +57,9 @@ export class SoundFX {
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
       this.noiseBuffer = this.makeNoiseBuffer(this.ctx);
+      this.brownBuffer = this.makeBrownNoiseBuffer(this.ctx);
+      this.crackBuffer = this.makeCrackBuffer(this.ctx);
+      this.satCurve = this.makeSaturationCurve();
       this.reverbIR = this.makeImpulseResponse(this.ctx, 1.0);
       this.reverb = this.ctx.createConvolver();
       this.reverb.buffer = this.reverbIR;
@@ -69,17 +78,62 @@ export class SoundFX {
     return buf;
   }
 
-  /** Decaying white-noise impulse response for the convolver. */
+  /** Decaying, low-pass-filtered (dark) noise impulse response for the convolver. */
   private makeImpulseResponse(ctx: AudioContext, seconds: number): AudioBuffer {
     const len = Math.floor(ctx.sampleRate * seconds);
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
       const data = buf.getChannelData(ch);
+      let lp = 0;
       for (let i = 0; i < len; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        lp += 0.12 * (Math.random() * 2 - 1 - lp);
+        data[i] = lp * Math.pow(1 - i / len, 3);
       }
     }
     return buf;
+  }
+
+  /** Brownian noise: leaky random-walk integrator, energy piled in the lows. */
+  private makeBrownNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    const len = Math.floor(ctx.sampleRate * 1.5);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let val = 0;
+    for (let i = 0; i < len; i++) {
+      val = (val + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      data[i] = val * 4;
+    }
+    return buf;
+  }
+
+  /** 2-3 micro-impulses of 3-8 clipped noise samples, 5-15ms apart. */
+  private makeCrackBuffer(ctx: AudioContext): AudioBuffer {
+    const len = Math.floor(ctx.sampleRate * 0.06);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    const bursts = 2 + Math.floor(Math.random() * 2);
+    let pos = 0;
+    for (let b = 0; b < bursts; b++) {
+      pos += Math.floor(ctx.sampleRate * (0.005 + Math.random() * 0.01));
+      const burstLen = 3 + Math.floor(Math.random() * 6);
+      for (let i = 0; i < burstLen && pos + i < len; i++) {
+        data[pos + i] = Math.sign(Math.random() * 2 - 1) * (0.7 + 0.3 * Math.random());
+      }
+    }
+    return buf;
+  }
+
+  /** Soft-clipping tanh curve for the WaveShaper. */
+  private makeSaturationCurve(): Float32Array<ArrayBuffer> {
+    const n = 1024;
+    const curve = new Float32Array(n) as Float32Array<ArrayBuffer>;
+    const drive = 2.5;
+    const norm = Math.tanh(drive);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(drive * x) / norm;
+    }
+    return curve;
   }
 
   /** Routes a node into master, also feeding the shared reverb send. */
@@ -139,60 +193,72 @@ export class SoundFX {
   }
 
   /**
-   * Explosion in three layers, size-scaled, through the shared reverb:
-   * crack (bandpass snap), crunch (sweeping resonant lowpass noise),
-   * rumble tail (sub-bass sine sweep).
+   * Explosion, size-scaled, gritty physical impact model:
+   * micro-fracture crack impulses -> ring-modulated brown-noise crunch
+   * with soft-clip saturation -> sub-bass rumble tail, all through the
+   * shared dark convolver reverb.
    */
   explosion(sizeRank: 0 | 1 | 2): void {
-    if (!this.ctx || !this.noiseBuffer || this.ctx.state !== 'running') return;
+    if (!this.ctx || !this.brownBuffer || !this.crackBuffer || !this.satCurve || this.ctx.state !== 'running') return;
     const t = this.now();
-    const nodes: { stop?: AudioScheduledSourceNode; disconnect: AudioNode }[] = [];
-    // larger rocks: heavier crunch, longer rumble
-    const crunchStart = [1200, 1000, 800][sizeRank];
-    const crunchEnd = [220, 180, 150][sizeRank];
+    const sources: AudioScheduledSourceNode[] = [];
+    const graph: AudioNode[] = [];
+    // larger rocks: lower fracture pitch, deeper/longer grind and rumble
+    const crunchStart = [1300, 1100, 900][sizeRank];
+    const crunchEnd = [260, 200, 150][sizeRank];
     const crunchDur = [0.2, 0.25, 0.3][sizeRank];
+    const carrierHz = [70, 55, 42][sizeRank];
     const rumbleDur = [0.35, 0.45, 0.55][sizeRank];
     const rumbleEnd = [55, 42, 30][sizeRank];
 
-    // 1) kinetic crack: short bandpass snap
+    // 1) kinetic crack: micro-impulse fractures before the boom
     const crack = this.ctx.createBufferSource();
-    crack.buffer = this.noiseBuffer;
-    crack.loop = true;
-    const crackBp = this.ctx.createBiquadFilter();
-    crackBp.type = 'bandpass';
-    crackBp.frequency.setValueAtTime(3000, t);
-    crackBp.frequency.exponentialRampToValueAtTime(1200, t + 0.02);
-    crackBp.Q.value = 1.2;
+    crack.buffer = this.crackBuffer;
     const crackGain = this.ctx.createGain();
-    crackGain.gain.setValueAtTime(0.5, t);
-    crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
-    crack.connect(crackBp).connect(crackGain);
+    crackGain.gain.setValueAtTime([0.55, 0.65, 0.75][sizeRank], t);
+    crack.connect(crackGain);
     this.connectBus(crackGain);
     crack.start(t);
-    crack.stop(t + 0.03);
-    nodes.push({ stop: crack, disconnect: crackBp });
-    nodes.push({ disconnect: crackGain });
+    sources.push(crack);
+    graph.push(crackGain);
 
-    // 2) mid-body crunch: sweeping resonant lowpass noise
-    const crunch = this.ctx.createBufferSource();
-    crunch.buffer = this.noiseBuffer;
-    crunch.loop = true;
+    // 2) ring-modulated crunch: brown noise swept through a resonant
+    // lowpass, multiplied by a low carrier for gritty sidebands
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.brownBuffer;
+    src.loop = true;
     const crunchLp = this.ctx.createBiquadFilter();
     crunchLp.type = 'lowpass';
     crunchLp.frequency.setValueAtTime(crunchStart, t);
     crunchLp.frequency.exponentialRampToValueAtTime(crunchEnd, t + crunchDur);
-    crunchLp.Q.value = 4;
-    const crunchGain = this.ctx.createGain();
-    crunchGain.gain.setValueAtTime(0.4, t);
-    crunchGain.gain.exponentialRampToValueAtTime(0.001, t + crunchDur + 0.05);
-    crunch.connect(crunchLp).connect(crunchGain);
-    this.connectBus(crunchGain);
-    crunch.start(t);
-    crunch.stop(t + crunchDur + 0.08);
-    nodes.push({ stop: crunch, disconnect: crunchLp });
-    nodes.push({ disconnect: crunchGain });
+    crunchLp.Q.value = 3;
+    const body = this.ctx.createGain();
+    body.gain.setValueAtTime(0.9, t);
+    body.gain.exponentialRampToValueAtTime(0.001, t + crunchDur + 0.08);
+    const ring = this.ctx.createGain();
+    ring.gain.value = 0;
+    const carrier = this.ctx.createOscillator();
+    carrier.type = 'sine';
+    carrier.frequency.value = carrierHz;
+    carrier.connect(ring.gain);
+    src.connect(crunchLp).connect(body).connect(ring);
 
-    // 3) low rumble tail: sub-bass sine sweep
+    // 3) nonlinear saturation: soft clip for dirty mid-range bite
+    const shaper = this.ctx.createWaveShaper();
+    shaper.curve = this.satCurve;
+    shaper.oversample = '2x';
+    const crunchOut = this.ctx.createGain();
+    crunchOut.gain.value = [0.8, 0.9, 1.0][sizeRank];
+    ring.connect(shaper).connect(crunchOut);
+    this.connectBus(crunchOut);
+    src.start(t);
+    carrier.start(t);
+    src.stop(t + crunchDur + 0.15);
+    carrier.stop(t + crunchDur + 0.15);
+    sources.push(src, carrier);
+    graph.push(crunchLp, body, ring, shaper, crunchOut);
+
+    // 4) low rumble tail: sub-bass sine sweep
     const sub = this.ctx.createOscillator();
     const subGain = this.ctx.createGain();
     sub.type = 'sine';
@@ -205,15 +271,14 @@ export class SoundFX {
     this.connectBus(subGain);
     sub.start(t);
     sub.stop(t + rumbleDur + 0.05);
-    nodes.push({ stop: sub, disconnect: subGain });
+    sources.push(sub);
+    graph.push(subGain);
 
-    const last = nodes[nodes.length - 1];
-    if (last?.stop) {
-      last.stop.onended = () => {
-        for (const n of nodes) n.stop?.disconnect();
-        for (const n of nodes) n.disconnect.disconnect();
-      };
-    }
+    // the sub tail outlasts everything; clean up the whole graph there
+    sub.onended = () => {
+      for (const s of sources) s.disconnect();
+      for (const n of graph) n.disconnect();
+    };
   }
 
   /** Ship destroyed: the large, deep boom. */
