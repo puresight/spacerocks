@@ -221,3 +221,32 @@ body {
     font-size: 14px;
   }
 }
+
+/* ===== PWA install button ===== */
+
+.install-button {
+  position: absolute;
+  z-index: 20;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 18px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #7df9ff;
+  background: rgba(125, 249, 255, 0.08);
+  border: 2px solid rgba(125, 249, 255, 0.7);
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.install-button:active {
+  background: rgba(125, 249, 255, 0.25);
+}
