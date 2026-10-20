@@ -8,6 +8,7 @@ import type { GameState, GameStateListener } from './state';
 import { computeAsteroidInertia, computeAsteroidMass, computeShipInertia, genAsteroidPolygon, randRange, type Vec2 } from './utils';
 import { SoundFX } from './sound';
 import { TouchControls } from './touch';
+import { GamepadInput } from './gamepad';
 
 type Body = RAPIER.RigidBody;
 
@@ -37,6 +38,7 @@ export class GameEngine {
   private input = new InputState();
   private touch = new TouchControls(this.input);
   private sound = new SoundFX();
+  private gamepad = new GamepadInput();
   private entityLayer = new Container();
   private entities = new Map<number, Entity>();
   private ship: Entity | null = null;
@@ -89,6 +91,7 @@ export class GameEngine {
     this.input.attach();
     this.sound.attach();
     this.touch.attach(container);
+    this.gamepad.attach();
     this.app.ticker.add(this.update);
     this.resizeHandler = () => this.onResize();
     window.addEventListener('resize', this.resizeHandler);
@@ -119,6 +122,7 @@ export class GameEngine {
     this.input.detach();
     this.sound.detach();
     this.touch.detach();
+    this.gamepad.detach();
     if (this.resizeHandler) window.removeEventListener('resize', this.resizeHandler);
     if (this.visualViewportHandler) {
       window.visualViewport?.removeEventListener('resize', this.visualViewportHandler);
@@ -176,6 +180,9 @@ export class GameEngine {
 
   // ===== Update loop =====
   private update = (ticker: { deltaTime: number }): void => {
+    const pad = this.gamepad.poll();
+    this.input.setGamepad(pad);
+    this.updateTouchVisibility(pad.active);
     this.checkStartInput();
     const clampedDelta = Math.min(ticker.deltaTime, 3);
     this.accumulator += clampedDelta / PHYSICS_HZ;
@@ -629,5 +636,17 @@ export class GameEngine {
       if (this.gameoverAt > 0 && performance.now() - this.gameoverAt < 600) return;
       this.startGame();
     }
+  }
+
+  /** Fade the on-screen touch controls while the gamepad is in use. */
+  private touchHiddenByPad = false;
+
+  private updateTouchVisibility(padActive: boolean): void {
+    if (!this.touch.root) return;
+    if (padActive === this.touchHiddenByPad) return;
+    this.touchHiddenByPad = padActive;
+    this.touch.root.style.opacity = padActive ? '0' : '1';
+    this.touch.root.style.pointerEvents = padActive ? 'none' : '';
+    this.touch.root.style.transition = 'opacity 0.25s ease';
   }
 }

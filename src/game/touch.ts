@@ -8,7 +8,7 @@ import type { InputState } from './input';
  * Attached only when touch capability exists.
  */
 export class TouchControls {
-  private root: HTMLDivElement | null = null;
+  root: HTMLDivElement | null = null;
   private buttons: { el: HTMLButtonElement; pointers: Set<number> }[] = [];
   private stickPointer: number | null = null;
   private stickBase: HTMLDivElement | null = null;

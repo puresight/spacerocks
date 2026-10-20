@@ -1,6 +1,17 @@
+import type { GamepadSnapshot } from './gamepad';
+
 export class InputState {
   private down = new Set<string>();
   private virtual = { rotate: 0, thrust: false, fire: false, brake: false };
+  private pad: GamepadSnapshot = {
+    connected: false,
+    rotateAxis: 0,
+    thrust: false,
+    fire: false,
+    brake: false,
+    start: false,
+    active: false,
+  };
 
   private onKeyDown = (e: KeyboardEvent) => {
     this.down.add(e.code);
@@ -58,6 +69,11 @@ export class InputState {
     this.virtual.brake = on;
   }
 
+  // Gamepad snapshot, written by the engine loop each animation frame
+  setGamepad(pad: GamepadSnapshot): void {
+    this.pad = pad;
+  }
+
   clearVirtual(): void {
     this.virtual.rotate = 0;
     this.virtual.thrust = false;
@@ -65,27 +81,32 @@ export class InputState {
     this.virtual.brake = false;
   }
 
-  // Combined steering axis: keyboard booleans merged with analog touch input
+  // Combined steering axis: keyboard, analog touch and gamepad stick merged
   get rotateAxis(): number {
-    let axis = this.virtual.rotate;
+    let axis = this.pad.rotateAxis + this.virtual.rotate;
     if (this.isDown('KeyA') || this.isDown('ArrowLeft')) axis -= 1;
     if (this.isDown('KeyD') || this.isDown('ArrowRight')) axis += 1;
     return Math.max(-1, Math.min(1, axis));
   }
 
   get thrust(): boolean {
-    return this.virtual.thrust || this.isDown('KeyW') || this.isDown('ArrowUp');
+    return (
+      this.pad.thrust ||
+      this.virtual.thrust ||
+      this.isDown('KeyW') ||
+      this.isDown('ArrowUp')
+    );
   }
 
   get fire(): boolean {
-    return this.virtual.fire || this.isDown('Space');
+    return this.pad.fire || this.virtual.fire || this.isDown('Space');
   }
 
   get brake(): boolean {
-    return this.virtual.brake;
+    return this.pad.brake || this.virtual.brake;
   }
 
   get restart(): boolean {
-    return this.isDown('KeyR') || this.isDown('Enter');
+    return this.pad.start || this.isDown('KeyR') || this.isDown('Enter');
   }
 }
