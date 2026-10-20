@@ -17,6 +17,8 @@ export class InputState {
     this.down.add(e.code);
     if (
       e.code === 'Space' ||
+      e.code === 'ShiftLeft' ||
+      e.code === 'ShiftRight' ||
       e.code === 'ArrowUp' ||
       e.code === 'ArrowDown' ||
       e.code === 'ArrowLeft' ||
@@ -94,7 +96,9 @@ export class InputState {
       this.pad.thrust ||
       this.virtual.thrust ||
       this.isDown('KeyW') ||
-      this.isDown('ArrowUp')
+      this.isDown('ArrowUp') ||
+      this.isDown('ShiftLeft') ||
+      this.isDown('ShiftRight')
     );
   }
 
@@ -108,5 +112,17 @@ export class InputState {
 
   get restart(): boolean {
     return this.pad.start || this.isDown('KeyR') || this.isDown('Enter');
+  }
+
+  /** True when any non-Escape input is held (keyboard, touch, or gamepad). */
+  get anyInput(): boolean {
+    if (this.pad.active || this.virtual.thrust || this.virtual.fire || this.virtual.brake) {
+      return true;
+    }
+    if (this.virtual.rotate !== 0) return true;
+    for (const code of this.down) {
+      if (code !== 'Escape') return true;
+    }
+    return false;
   }
 }

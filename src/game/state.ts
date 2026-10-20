@@ -1,4 +1,4 @@
-export type GamePhase = 'ready' | 'playing' | 'gameover';
+export type GamePhase = 'ready' | 'playing' | 'paused' | 'gameover';
 
 export interface GameState {
   phase: GamePhase;

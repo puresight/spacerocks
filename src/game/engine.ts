@@ -61,6 +61,7 @@ export class GameEngine {
   private worldHeight = 720;
   private resizeHandler?: () => void;
   private visualViewportHandler?: () => void;
+  private host: HTMLElement | null = null;
 
   async mount(container: HTMLElement): Promise<void> {
     await initRapier();
@@ -98,6 +99,11 @@ export class GameEngine {
     this.visualViewportHandler = () => this.onResize();
     window.visualViewport?.addEventListener('resize', this.visualViewportHandler);
     window.visualViewport?.addEventListener('scroll', this.visualViewportHandler);
+    this.host = container;
+    container.addEventListener('pointerdown', this.onGestureDown, { passive: true });
+    container.addEventListener('pointermove', this.onGestureMove, { passive: true });
+    container.addEventListener('pointerup', this.onGestureUp, { passive: true });
+    container.addEventListener('pointercancel', this.onGestureUp, { passive: true });
 
     const isTouch =
       'ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0;
@@ -108,7 +114,7 @@ export class GameEngine {
       isTouch
         ? 'LEFT: TURN ARROWS + THRUST\nRIGHT: FIRE + BRAKE'
         : 'W A D / Arrows to move - SPACE to fire',
-      isTouch ? 'TAP FIRE TO START' : 'PRESS ENTER TO START',
+      isTouch ? 'TAP FIRE TO START' : 'PRESS SPACE TO START',
       this.worldWidth,
       this.worldHeight
     );
@@ -127,6 +133,13 @@ export class GameEngine {
     if (this.visualViewportHandler) {
       window.visualViewport?.removeEventListener('resize', this.visualViewportHandler);
       window.visualViewport?.removeEventListener('scroll', this.visualViewportHandler);
+    }
+    if (this.host) {
+      this.host.removeEventListener('pointerdown', this.onGestureDown);
+      this.host.removeEventListener('pointermove', this.onGestureMove);
+      this.host.removeEventListener('pointerup', this.onGestureUp);
+      this.host.removeEventListener('pointercancel', this.onGestureUp);
+      this.host = null;
     }
     if (!this.app.renderer) return;
     this.clearEntities();
@@ -183,6 +196,7 @@ export class GameEngine {
     const pad = this.gamepad.poll();
     this.input.setGamepad(pad);
     this.updateTouchVisibility(pad.active);
+    this.checkPauseInput();
     this.checkStartInput();
     const clampedDelta = Math.min(ticker.deltaTime, 3);
     this.accumulator += clampedDelta / PHYSICS_HZ;
@@ -521,7 +535,7 @@ export class GameEngine {
     this.hud.showOverlay(
       'GAME OVER',
       `FINAL SCORE ${this.state.score}`,
-      this.isTouch ? 'TAP FIRE TO RESTART' : 'PRESS ENTER TO RESTART',
+      this.isTouch ? 'TAP FIRE TO RESTART' : 'PRESS SPACE TO RESTART',
       this.worldWidth,
       this.worldHeight
     );
@@ -631,6 +645,10 @@ export class GameEngine {
   private gameoverAt = 0;
 
   private checkStartInput(): void {
+    if (this.state.phase === 'paused') {
+      if (this.input.anyInput) this.resumeGame();
+      return;
+    }
     if (this.state.phase !== 'ready' && this.state.phase !== 'gameover') return;
     if (this.input.restart || this.input.fire) {
       if (this.gameoverAt > 0 && performance.now() - this.gameoverAt < 600) return;
@@ -649,4 +667,78 @@ export class GameEngine {
     this.touch.root.style.pointerEvents = padActive ? 'none' : '';
     this.touch.root.style.transition = 'opacity 0.25s ease';
   }
+
+  // ===== Pause / forfeit =====
+  private escWasDown = false;
+  private pauseArmedAt = 0;
+
+  private checkPauseInput(): void {
+    const esc = this.input.isDown('Escape');
+    const escPressed = esc && !this.escWasDown;
+    this.escWasDown = esc;
+    if (!escPressed) return;
+
+    if (this.state.phase === 'playing') {
+      this.pauseGame();
+    } else if (this.state.phase === 'paused') {
+      this.forfeitGame();
+    }
+  }
+
+  private pauseGame(): void {
+    this.sound.setThrust(false);
+    this.setFlameVisible(false);
+    this.setState({ ...this.state, phase: 'paused' });
+    this.hud.showOverlay(
+      'PAUSED',
+      'ANY KEY TO RESUME',
+      'ESC AGAIN TO FORFEIT',
+      this.worldWidth,
+      this.worldHeight
+    );
+    this.pauseArmedAt = performance.now();
+  }
+
+  private forfeitGame(): void {
+    if (performance.now() - this.pauseArmedAt < 400) return;
+    this.hud.hideOverlay();
+    this.gameOver();
+  }
+
+  private resumeGame(): void {
+    if (performance.now() - this.pauseArmedAt < 400) return;
+    this.hud.hideOverlay();
+    this.setState({ ...this.state, phase: 'playing' });
+  }
+
+  /** Swipe-down-from-top gesture: first swipe pauses, second forfeits. */
+  private gesturePointerId: number | null = null;
+  private gestureStartY = 0;
+  private gestureMaxDy = 0;
+
+  private onGestureDown = (e: PointerEvent): void => {
+    if (this.gesturePointerId !== null) return;
+    this.gesturePointerId = e.pointerId;
+    this.gestureStartY = e.clientY;
+    this.gestureMaxDy = 0;
+  };
+
+  private onGestureMove = (e: PointerEvent): void => {
+    if (e.pointerId !== this.gesturePointerId) return;
+    this.gestureMaxDy = Math.max(this.gestureMaxDy, e.clientY - this.gestureStartY);
+  };
+
+  private onGestureUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.gesturePointerId) return;
+    this.gesturePointerId = null;
+    const SWIPE_DIST = 60;
+    const TOP_BAND = 80;
+    if (this.gestureStartY > TOP_BAND || this.gestureMaxDy < SWIPE_DIST) return;
+    this.gestureMaxDy = 0;
+    if (this.state.phase === 'playing') {
+      this.pauseGame();
+    } else if (this.state.phase === 'paused') {
+      this.forfeitGame();
+    }
+  };
 }
