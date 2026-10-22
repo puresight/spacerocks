@@ -10,12 +10,12 @@ A classic vector-style arcade shooter built with React, TypeScript, PixiJS, and 
 
 ### Controls — keyboard
 
-| Action  | Keys                     |
-| ------- | ------------------------ |
-| Rotate  | `A` / `D` or arrow keys  |
-| Thrust  | `W` or up arrow          |
-| Fire    | `Space`                  |
-| Start / restart | `Enter` or `R`   |
+| Action          | Keys                    |
+| --------------- | ----------------------- |
+| Rotate          | `A` / `D` or arrow keys |
+| Thrust          | `W` or up arrow         |
+| Fire            | `Space`                 |
+| Start / restart | `Enter` or `R`          |
 
 ### Controls — touch
 
@@ -90,3 +90,7 @@ The build emits a static SPA in `/dist` configured for Cloudflare Workers static
 ## Tuning the game
 
 Almost every gameplay number lives in `src/game/config.ts`: ship thrust and torque, bullet speed and cooldown, asteroid sizes/speeds/points, scoring rules, and the color palette. Change a value and the dev server hot-reloads instantly.
+
+## Architecture
+
+- [architecture](./architecture.md)

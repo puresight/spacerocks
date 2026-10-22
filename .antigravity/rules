@@ -1,0 +1,6 @@
+# Antigravity Workspace Directives
+- Package Manager: npm
+- Dev Command: npm run dev
+- Build Command: npm run build
+- Execution: Non-interactive; verify with build/typecheck before marking done.
+- Compatibility: Do not alter package scripts or add native binary packages incompatible with Bolt.new WebContainers.
